@@ -1,0 +1,360 @@
+
+	<html>
+	<head>
+        <meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />
+		<title>Harlowe To JSON</title>
+        <script type='text/javascript'>
+            /**
+* JTwine-To-JSON: modified by Jason Francis for use in BL-MSCH-C220
+*
+* Originally adapted from [twine-to-json](https://jtschoonhoven.github.io/twine-to-json/)
+*
+* Copyright (c) 2022 Jason Francis
+*
+* Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+* associated documentation files (the 'Software'), to deal in the Software without restriction,
+* including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+* and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+* subject to the following conditions:
+*
+* The above copyright notice and this permission notice shall be included in all copies or substantial
+* portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+* LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+* WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+const STORY_TAG_NAME = 'tw-storydata';
+const PASSAGE_TAG_NAME = 'tw-passagedata';
+const FORMAT_TWINE = 'twine';
+const FORMAT_HARLOWE_3 = 'harlowe-3';
+const VALID_FORMATS = [FORMAT_TWINE, FORMAT_HARLOWE_3];
+/**
+ * Convert Twine story to JSON.
+ */
+function twineToJSON(format) {
+    const storyElement = document.getElementsByTagName(STORY_TAG_NAME)[0];
+    const storyMeta = getElementAttributes(storyElement);
+    const result = {
+        story: storyMeta.name,
+		startnode: storyMeta.startnode		
+    };
+    validate(format);
+    const passageElements = Array.from(storyElement.getElementsByTagName(PASSAGE_TAG_NAME));
+    result.passages = passageElements.map((passageElement) => {
+        return processPassageElement(passageElement, format);
+    });
+	for (i in result.passages){
+		p = result.passages[i];
+		for (j in p["links"]){
+			l = p["links"][j];
+			temp = parseInt(j) + 1
+			l["selection"] = temp.toString();
+			n = l["newPassage"];
+			for (k in result.passages){
+				s = result.passages[k];
+				if (s["name"] == n){
+					l["pid"] = s["pid"]
+				}
+			}
+		}
+	}
+    return result;
+}
+/**
+ * Validate story and inputs. Currently this only validates the format arg. TODO: make this more robust.
+ */
+function validate(format) {
+    const isValidFormat = VALID_FORMATS.some(validFormat => validFormat === format);
+    if (!isValidFormat) {
+        throw new Error('Format is not valid.');
+    }
+}
+/**
+ * Convert the HTML element for a story passage to JSON.
+ */
+function processPassageElement(passageElement, format) {
+    const passageMeta = getElementAttributes(passageElement);
+    const result = {
+        name: passageMeta.name,
+        tags: passageMeta.tags,
+        pid: passageMeta.pid,
+    };
+    result.text = passageElement.innerText.trim();
+    Object.assign(result, processPassageText(result.text, format));
+    result.cleanText = sanitizeText(result.text, result.links, result.hooks, format);
+    return result;
+}
+function processPassageText(passageText, format) {
+    const result = { links: [] };
+    if (format === FORMAT_HARLOWE_3) {
+        result.hooks = [];
+    }
+    let currentIndex = 0;
+    while (currentIndex < passageText.length) {
+        const maybeLink = extractLinksAtIndex(passageText, currentIndex);
+        if (maybeLink) {
+            result.links.push(maybeLink);
+            currentIndex += maybeLink.original.length;
+        }
+        if (format !== FORMAT_HARLOWE_3) {
+            currentIndex += 1;
+            continue;
+        }
+        const maybeLeftHook = extractLeftHooksAtIndex(passageText, currentIndex);
+        if (maybeLeftHook) {
+            result.hooks.push(maybeLeftHook);
+            currentIndex += maybeLeftHook.original.length;
+        }
+        currentIndex += 1;
+        const maybeHook = extractHooksAtIndex(passageText, currentIndex);
+        if (maybeHook) {
+            result.hooks.push(maybeHook);
+            currentIndex += maybeHook.original.length;
+        }
+    }
+    return result;
+}
+function extractLinksAtIndex(passageText, currentIndex) {
+    const currentChar = passageText[currentIndex];
+    const nextChar = passageText[currentIndex + 1];
+    if (currentChar === '[' && nextChar === '[') {
+        const link = getSubstringBetweenBrackets(passageText, currentIndex + 1);
+        const leftSplit = link.split('<-', 2);
+        const rightSplit = link.split('->', 2);
+        const original = passageText.substring(currentIndex, currentIndex + link.length + 4);
+        if (leftSplit.length === 2) {
+            return { original: original, label: leftSplit[1].trim(), newPassage: leftSplit[0].trim(), pid: "", selection: "" };
+        }
+        else if (rightSplit.length === 2) {
+            return { original: original, label: rightSplit[0].trim(), newPassage: rightSplit[1].trim(), pid: "", selection: "" };
+        }
+        else {
+            return { original: original, label: link.trim(), newPassage: link.trim(), pid: "", selection: "" };
+        }
+    }
+}
+function extractLeftHooksAtIndex(passageText, currentIndex) {
+    const regexAlphaNum = /[a-z0-9]+/i;
+    const currentChar = passageText[currentIndex];
+    if (currentChar === '|') {
+        const maybeHookName = getSubstringBetweenBrackets(passageText, currentIndex, '|', '>');
+        if (maybeHookName.match(regexAlphaNum)) {
+            const hookStartIndex = currentIndex + maybeHookName.length + 2; // advance to next char after ">"
+            const hookStartChar = passageText[hookStartIndex];
+            if (hookStartChar === '[') {
+                const hookText = getSubstringBetweenBrackets(passageText, hookStartIndex);
+                const hookEndIndex = hookStartIndex + hookText.length + 2;
+                const original = passageText.substring(currentIndex, hookEndIndex);
+                return { hookName: maybeHookName, hookText: hookText, original: original };
+            }
+        }
+    }
+}
+function extractHooksAtIndex(passageText, currentIndex) {
+    const regexAlphaNum = /[a-z0-9]+/i;
+    const currentChar = passageText[currentIndex];
+    const nextChar = passageText[currentIndex + 1];
+    const prevChar = currentIndex && passageText[currentIndex - 1];
+    if (currentChar === '[' && nextChar !== '[' && prevChar !== '[') {
+        const hookText = getSubstringBetweenBrackets(passageText, currentIndex);
+        const hookEndIndex = currentIndex + hookText.length + 2;
+        const hookEndChar = passageText[hookEndIndex];
+        if (hookEndChar === '<') {
+            const maybeHookName = getSubstringBetweenBrackets(passageText, hookEndIndex, '<', '|');
+            if (maybeHookName.match(regexAlphaNum)) {
+                const original = passageText.substring(currentIndex, hookEndIndex + maybeHookName.length + 2);
+                return { hookName: maybeHookName, hookText: hookText, original: original };
+            }
+        }
+        const original = passageText.substring(currentIndex, hookText.length + 2);
+        return { hookName: undefined, hookText: hookText, original: original };
+    }
+}
+function sanitizeText(passageText, links, hooks, format) {
+    links.forEach((link) => {
+        passageText = passageText.replace(link.original, '');
+    });
+    if (format === FORMAT_HARLOWE_3) {
+        hooks.forEach((hook) => {
+            passageText = passageText.replace(hook.original, '');
+        });
+    }
+    return passageText.trim();
+}
+/**
+ * Convert an HTML element to an object of attribute values.
+ */
+function getElementAttributes(element) {
+    const result = {};
+    const attributes = Array.from(element.attributes);
+    attributes.forEach((attribute) => {
+        result[attribute.name] = attribute.value;
+    });
+    return result;
+}
+/**
+ * True if string starts with the given substring.
+ */
+function stringStartsWith(string, startswith) {
+    return string.trim().substring(0, startswith.length) === startswith;
+}
+function getSubstringBetweenBrackets(string, startIndex, openBracket, closeBracket) {
+    openBracket = openBracket || '[';
+    closeBracket = closeBracket || ']';
+    const bracketStack = [];
+    let currentIndex = startIndex || 0;
+    let substring = '';
+    if (string[currentIndex] !== openBracket) {
+        throw new Error('startIndex of getSubstringBetweenBrackets must correspond to an open bracket');
+    }
+    while (currentIndex < string.length) {
+        const currentChar = string[currentIndex];
+        // pull top bracket from stack if we hit a close bracket
+        if (currentChar === closeBracket) {
+            bracketStack.pop();
+        }
+        // build substring so long as stack is populated
+        if (bracketStack.length) {
+            substring += currentChar;
+        }
+        // add open brackets to the top of the stack
+        if (currentChar === openBracket) {
+            bracketStack.push(currentChar);
+        }
+        // return if stack is empty and substring is set
+        if (!bracketStack.length) {
+            return substring;
+        }
+        currentIndex += 1;
+    }
+    return substring;
+}
+        </script>
+	</head>
+	<body>
+        <pre id='content'></pre>
+        <div id='storyData' style='display: none;'><tw-storydata name="Homunculus" startnode="1" creator="Twine" creator-version="2.3.16" ifid="03A730B7-B8E9-4D28-8401-C58F148DADC9" zoom="0.6" format="JTwine-To-JSON" format-version="0.1.0" options="" hidden><style role="stylesheet" id="twine-user-stylesheet" type="text/twine-css"></style><script role="script" id="twine-user-script" type="text/twine-javascript"></script><tw-passagedata pid="1" name="First Room (WIP)" tags="" position="951,330" size="100,100">You suddenly jolt into conciousness, as if awakened from a decade long slumber. Sitting up, you notice you&#39;re completely naked, surrounded by what looks like a glowing circle with runes on it, and covered in (hopefully someone else&#39;s) blood. There is a large, steel door located along one of the walls. As your eyes get used to the dark of the room, you see a small white card with what used to be a picture and a name, but has been badly burned. You can barely make out the words &quot;Michael Clark&quot;.
+After regaining the energy to stand, you slowly lurch to your feet. You can see your breath. Do you:
+[[Examine the room further-&gt;Examine the room further]]
+[[Check out the door-&gt;Check out the door]]</tw-passagedata><tw-passagedata pid="2" name="Examine the room further" tags="1" position="1023,474" size="100,100">Still struggling to make out shapes in the near pitch-black room, you shuffle around and feel dust or sand under your feet. Picking it up, it stains your hands- you can tell it&#39;s some sort of ash. The only light in the room surrounds the circle you woke up in. It&#39;s not made of chalk, or paint, rather something you&#39;ve never quite seen before. 
+[[Check out the door-&gt;Check out the door]]</tw-passagedata><tw-passagedata pid="3" name="Check out the door" tags="1" position="863,474" size="100,100">As you move closer to the large door, you can tell that it&#39;s a bit dinged up. Pulling at it does nothing, and neither does pushing. With no other option, you charge at the door. Putting all of your weight into it, a couple attempts pass before the doorframe is empty and the steel door lies 10 feet behind it. You see a small room with flickering lights on the other side.
+[[Move into the room-&gt;Airlock]]</tw-passagedata><tw-passagedata pid="4" name="Airlock" tags="" position="298.3333333333333,413" size="100,100">You step through the doorway, into a small sterile room- only to face another door. Lining the walls are lockers and some sort of anti-chemical suits. The door leading outside seems in better condition than the one you busted open to get into this room. A jumpsuit is a hell of a lot better than being naked, so you put one on despite it not really fitting that well. 
+[[Examine lockers-&gt;Examine lockers]]
+[[Attempt to open the door-&gt;Attempt to open door ]]</tw-passagedata><tw-passagedata pid="5" name="Examine lockers" tags="" position="45,335" size="100,100">The lockers have small, glowing devices on where the handle would be, with a small slot that looks about the size of the ID card you found next to you when you awoke. 
+[[Back to room-&gt;Airlock]]
+[[Attempt to open lockers-&gt;Attempt to open lockers]]</tw-passagedata><tw-passagedata pid="6" name="Attempt to open door " tags="1" position="599,499" size="100,100">The door has a similar device attatched to it as the lockers that are also in the room- you swipe the ID you found. After a couple seconds, the door shudders open and slowly retreats to an open state. Red light floods into the airlock, pulsing from the numerous sirens. Suddenly, a warning bellows in your ears, seemingly from in the walls: &quot;ALERT: Primary generators OFFLINE, facility will be sealed once emergency power is drained. Recommendation: Director please collect all critical research and evacuate the facility&quot;
+[[Move into the large room-&gt;Hallway]]</tw-passagedata><tw-passagedata pid="7" name="Attempt to open lockers" tags="2" position="40,484" size="100,100">After a couple aggrevating tries at figuring out how the small white card and lockers interact, you manage to open one. You see a pair of brown shoes, a small satchel, and a clean(ish) suit. 
+[[Back to room-&gt;Airlock]]
+[[Search small bag-&gt;Search satchel]]</tw-passagedata><tw-passagedata pid="8" name="Search satchel" tags="1" position="42,617" size="100,100">Rummaging through the small bag, you find a locked tablet, tissues, a wallet, and a folder piece of paper. Opening it, it&#39;s filled with words on just the front side. Filing through the wallet, you find a similar white card with the same name &#39;&#39;&quot;Michael Clark&quot;&#39;&#39;. No matter how hard you look into the picture on the card, you can&#39;t seem to make out the shape of a face- just looking at it gives you a headache. There&#39;s a few other cards with the name on them, but no picture as well as some paper money.
+[[Back to room-&gt;Airlock]]
+[[Read folded paper-&gt;Read folded paper]]
+[[Attempt to unlock tablet-&gt;Attempt to unlock tablet]]</tw-passagedata><tw-passagedata pid="9" name="Read folded paper" tags="1" position="339,638" size="100,100">Skimming the paper, it appears to be some sort of speech or presentation. It talks about the next generation of Humanity- how they will be stronger, smarter, and better than ever before. It yammers on about this for the entirety of the paper, and you are left feeling little dissapointed at how familiar the words are to you. 
+[[Back to room-&gt;Airlock]]</tw-passagedata><tw-passagedata pid="10" name="Attempt to unlock tablet" tags="1" position="47,732" size="100,100">You punch in a 4 number combination to the tablet, without avail.
+[[Back to room-&gt;Airlock]]
+[[Try again-&gt;Attempt2]]</tw-passagedata><tw-passagedata pid="11" name="Hallway" tags="" position="602,700" size="100,100">You walk through the door from the airlock into a large, nine-sided room. There are 9 doors, one for each side of the room- counting the one you just walked in from. They have labels above the doors for each branch off of the hallway.
+[[To the Dorms-&gt;Dorm rooms]]
+[[To the Morgue-&gt;Morgue]]
+[[To the Lab-&gt;Laboratory]]
+[[To Training rooms-&gt;Training]]
+[[To the Library-&gt;Library]]
+[[To the Cafeteria-&gt;Cafeteria]]
+[[To the Admin rooms-&gt;Administrationfake]]
+[[To the Exit-&gt;Exit]]</tw-passagedata><tw-passagedata pid="12" name="Dorm rooms" tags="1" position="25,850" size="100,100">Entering the door marked &quot;Dormitories&quot;, you walk into a medium sized room, lined with bunk beds as well as a large table in the center. Looking closely, you can see storage trunks at the foot of each bunk. 
+[[Investigate the table-&gt;Investigate the table]]
+[[Investigate the storage trunks-&gt;Investigate the storage trunks]]
+[[Back to Hallway-&gt;Hallway]]</tw-passagedata><tw-passagedata pid="13" name="Morgue" tags="1" position="180,850" size="100,100">Passing into the morgue, you are overcome with an oppressive feeling of interruption- you are not meant to be here. In one of the corners is a pile of bodies, appearing to be hastily thrown out of the way. There is also a surgical table in the center of the room, right above red-stained drain.
+[[Investigate the pile of bodies-&gt;Investigate bodies]]
+[[Examine the surgical table-&gt;Investigate table]]
+[[Back to Hallway-&gt;Hallway]]</tw-passagedata><tw-passagedata pid="14" name="Laboratory" tags="1" position="441,856" size="100,100">Entering the room marked &quot;Laboratory&quot;, you recognize equipment like scales and microscopes, but there are machines in this room that you have definitely never seen before. Some of them are covered in strange symbols, which feel eerily familiar.
+[[Investigate machines-&gt;Investigate machines]]
+[[Take a deeper look around-&gt;Deeplook]]
+[[Back to Hallway-&gt;Hallway]]</tw-passagedata><tw-passagedata pid="15" name="Training" tags="1" position="677,851" size="100,100">The room marked &quot;Training&quot; seems to be a hybrid, combining a meeting and lecture space with what seems like a gym. The classroom portion has a board, a single desk, and is filled with bookshelves, while the other portion is filled with what looks to be exercise machinery and medical tech.
+[[Investigate the Gym-&gt;Gym]]
+[[Investigate the School-&gt;School]]
+[[Back to Hallway-&gt;Hallway]]</tw-passagedata><tw-passagedata pid="16" name="Library" tags="1" position="947,845" size="100,100">Stepping into one of the larger rooms connected to the main hallway, marked &quot;Library&quot;, you are greeted with an atmosphere unlike every other room you&#39;ve visited so far (and a lot like the one you woke up in). Despite being a completely sealed room besides from the entrance/exit door, it appears as if a tornado has ripped the room to shreds. Book pages are strewn everywhere along the floor, and a good portion of the towering bookshelves are toppled onto eachother. Numerous symbols and charms cover almost every inch of surface area in the room, on every object- almost seared into them. It looks like there&#39;s a large pile of paper near one of the corners of the room.
+[[Investigate the bookshelves-&gt;Investigate bookshelves]]
+[[Investigate the papers-&gt;Investigate papers]]
+[[Investigate pile of papers-&gt;Investigate pile]]
+[[Back to Hallway-&gt;Hallway]]</tw-passagedata><tw-passagedata pid="17" name="Cafeteria" tags="1" position="1223,845" size="100,100">As you pass through the doorway marked &quot;Cafeteria&quot;, you enter a similar-sized room to all of the others connected to the hallway. There are party banners and hats strewn about, with some hanging from the ceiling. There is a door marked &quot;Kitchen&quot; that leads to the area behind some serving lanes. Trays of various food items are on top of some of the dining tables, mostly empty. While thinking about what kind of celebration could have taken place here, you feel yourself getting a bit hungry.
+[[Scrounge up some food-&gt;Food]]
+[[Investigate kitchen-&gt;Kitchen]]</tw-passagedata><tw-passagedata pid="18" name="Administration" tags="1" position="2056.3333333333335,522.3333333333333" size="100,100">You enter the administration office to a well-decorated room, far from the clean atmosphere of the Hallway or Airlock. Towards the back of the room, there is a large desk with a nameplate. It reads &quot;Michael Clark&quot;. All along the sides of the room are cabinets, which appear to be locked. In a burst of curiosity, you sit down at the chair to see if any of the desk cabinets are unlocked. Suddenly, a speaker near your head blares: &quot;COMMENCING DATA BACKUP. PLEASE SUBMIT DEVICE. The nameplate is kicked over and reveals a small docking port.
+[[Connect the tablet-&gt;Passatmpt]]</tw-passagedata><tw-passagedata pid="19" name="Investigate the table" tags="1" position="24,1003" size="100,100">As you approach the table, you can tell there are numerous sets of cards and chips spread across it, some in neat piles. Surrounding the table are chairs, most of which are covered with ash and clothes strewn about them. Rummaging through the clothes, you find another wallet as well as a keyring with what looks like a car key. Inside the wallet is a family picture- you can&#39;t make out any of the faces for some reason, and your head begins to pound. You put the picture away.
+[[Back to room-&gt;Dorm rooms]]</tw-passagedata><tw-passagedata pid="20" name="Investigate the storage trunks" tags="2" position="18,1118" size="100,100">Investigating the trunks, some are locked shut while others are wide open, containing nothing but toiletries and various articles of clothing.
+[[Back to room-&gt;Dorm rooms]]</tw-passagedata><tw-passagedata pid="21" name="Investigate bodies" tags="" position="144,998" size="100,100">Moving closer to the bodies, an intense feeling of grief and loss comes over you. Pulling them off of the pile, there are six of them. You can tell that each of them has had a specific part of their body removed surgically- there is a tag on each body detailing their former profession, as well as the part that was removed:
+The mathematician had his head removed
+The personal trainer had their entire torso removed
+The marine had his arms and legs removed
+The sculptor had his hands removed
+The sniper had his eyes removed
+The chef had his nose and tongue removed
+[[Back to Hallway-&gt;Hallway]]
+[[Back to Morgue-&gt;Morgue]]</tw-passagedata><tw-passagedata pid="22" name="Investigate table" tags="" position="262,997" size="100,100">Attempting to even inch towards the surgical table in the center of the room results in an utterly repulsive feeling, every alarm in your brain firing at once to avoid this seemingly mundane object.
+[[Proceed-&gt;Pullback]]
+[[Retreat to Morgue-&gt;Morgue]]</tw-passagedata><tw-passagedata pid="23" name="Pullback" tags="" position="141,1122" size="100,100">Ignoring the chaos of your thoughts screaming at you to not go towards the table, you press on. Barely managing to take a single step every ten-ish seconds, you feel an almost physical force pushing you away from the table. Scratching at your arms and legs beckons you back to the entrance of the room, and you swear you can feel a tight grip on your shoulder.
+[[Push on-&gt;Revelation]]
+[[Retreat to Morgue-&gt;Morgue]]</tw-passagedata><tw-passagedata pid="24" name="Revelation" tags="4" position="260,1123" size="100,100">Just as you step within arm&#39;s reach of the table, you feel searing pain in your temples as your body goes limp- you fade from conciousness in less than a couple seconds. On top of ear-piercing ringing, your senses are overloaded with the sounds of saw on bone and rending flesh.
+Not sure how much time has passed, your eyes pry open to see a ring of six people standing over your idle body on the floor. You blink once and they&#39;re still there, your mind must be playing tricks on you. Once more, and they&#39;re gone. You slowly rise to your feet, back near the exit to the Hallway.
+[[Exit the Morgue-&gt;Hallway]]
+</tw-passagedata><tw-passagedata pid="25" name="Investigate machines" tags="1" position="377,979" size="100,100">Stepping up to the side of one of the unidentified machines, you feel beckoned towards the symbols covering it. Almost as if you were being puppeteered, your arm reaches out and brushes along multiple different symbols. As you touch them, a voice in your head whispers a word. You presume this is the meaning of the symbols. The words in your head, as they come to you, are &quot;Mercury&quot;, &quot;Sulfur&quot;, &quot;Air&quot;, and &quot;Gold&quot;. Absolutely clueless on how you were able to decipher these, you feel a connection to them that you can&#39;t even begin to explain.
+[[Back to Laboratory-&gt;Laboratory]]
+
+</tw-passagedata><tw-passagedata pid="26" name="Deeplook" tags="2" position="490,982" size="100,100">Looking around the room, you find a set of filing cabinets covered by a tarp. Lifting up the tarp, a layer of ash flies off and reveals that all of them are, unfortunately, locked. However, you find a water-damaged notebook resting on top of them. Reading it, you find 8 entries that aren&#39;t smudged into illegibility by the water damage.
+8/20/35:  Today is the founding day of our lab, while our methods will likely be frowned upon by the outside world the future of humanity is worth whatever persecution we face!
+3/9/36: Attempting to create a specimen from scratch or copying from a template clearly isn’t working we may have to take a more violent route
+4/22/36: My idea to harvest samples instead of attempting to create our own has been accepted finally. My Co-workers aren’t excited by the idea but progress requires sacrifice.
+10/14/36: Our first attempt went horribly. The medium we used for the ritual appears to have been insufficient. When we started all of the samples seemed to take in more energy than intended because of this and covered everything in a layer of gore. We have a long road ahead of us.
+9/31/37: We need to think outside of the box. We have tried practically every material on the fucking periodic table and none worked. We even drained a good portion of the budget, making a gold circle for fucks sake! 
+10/7/37: I have a new idea but it&#39;s really going to be pushing things. I got the idea when we watched Jurrasic Park last night. I just hope this works.
+12/19/37: I made a crude sample of the new medium, it&#39;s gross it’s diluted as hell, and it scares the shit out of me but this crappy sample alone already matches gold in its ability to conduct energy.
+7/5/39: After all the blood sweat and tears we finally have a medium that works. It is costly as hell and a pain in the ass to make but results are results. Now we just need to harvest some fresh samples and God willing we will have done it.
+[[Back to Laboratory-&gt;Laboratory]]</tw-passagedata><tw-passagedata pid="27" name="Gym" tags="1" position="611,984" size="100,100">In the athletic half of the room, the numerous fitness machines look well cared for and untouched. There are simple weights, treadmills, and some machines you don&#39;t recognize. Everything feels a bit like it&#39;s being saved for something.
+[[Back to Training room-&gt;Training]]</tw-passagedata><tw-passagedata pid="28" name="School" tags="1" position="731,980" size="100,100">Exploring the educational side of the room, everything seems pretty well put togehter, despite the lack of any other desks beside the other one. While examining the bookshelves, you realize that the subject range and sorting of the books is all over the place- Kindergarten books on animals right next to a Quantum Mechanics textbook, for example. 
+[[Back to Training room-&gt;Training]]</tw-passagedata><tw-passagedata pid="29" name="Investigate bookshelves" tags="3" position="842,983" size="100,100">Walking (almost wading) through the papers on the floor towards the only group of standing bookshelves, you attempt to make out some names of books on the shelf as you get closer. They&#39;re all covered in the same strange marks as the rest of the room, so you can barely make out some of the titles. Most of the books remaining in the library seem to pertain to the study of occultism.
+Taking a book off of the shelf, even the sides that would have been surrounded by other books are layered in the same now familiar markings. As you dare to open the book in your hand, you are instantly barraged with a tinnitus-inducing rumble and some sort of force between corporeal and incorporeal lunges out at you- your reaction time saves you as you dodge out of its way and close the book, returning the force to it. Shuddering and still a little in shock, you put the book back on the shelf only to realize that every other book is almost quivering in fear at what just happened. Maybe your mind is playing tricks on you again, it wouldn&#39;t be the first time.
+[[Back to the Library-&gt;Library]]</tw-passagedata><tw-passagedata pid="30" name="Investigate papers" tags="2" position="947,981" size="100,100">Hurriedly, you begin to rummage through the small sea of papers that covers your feet. A large portion of them appear to be pages of books ripped off of the shelves here, but some don&#39;t fit in with those. They&#39;re different sizes and colors, all hand-scribbled notes on different processes, using another odd set of symbols different from the one covering everything in the room.
+[[Back to Library-&gt;Library]]</tw-passagedata><tw-passagedata pid="31" name="Investigate pile" tags="1" position="1054,980" size="100,100">Approaching the pile of paper, it&#39;s raised a good couple of inches above the rest of the paperin the room, as well as having a circle around it revealing the dark and burnt floor of the library. Sifting through the paper, you find a pile of clothes, dirtied by sitting on top of a pile of ash. As you search the clothes, you find a hastily written note on a small piece of paper. It was scribbled so quickly that it&#39;s almost illegible.
+It reads: &quot;What we have done here is nothing short of monstrous Theres no denying this but we did it anyway I knew something would happen to us for what we did Getting arrested kidnapping for our research even assassination wasnt off the table but it turns out we may pay for our crimes sooner than we thought Every time we studied dangerous alchemical rites there was always mention of a cost We thought it would be energy that we could supply or some sacrifice we would commit but in reality I think it is much worse Every major rite we studied came from an alchemist who went missing whose face was never seen When I tried warning the others they called me paranoid and some of them even laughed at me I figured hiding in the Library would be my best bet considering how many protective charms are here I pray Im paranoid but in the case that Im not and even these charms cant save me I ask whoever is reading this please dont repeat our mistakes&quot;
+[[Back to Library-&gt;Library]]
+
+</tw-passagedata><tw-passagedata pid="32" name="Attempt2" tags="1" position="218,701.6666666666666" size="100,100">You hurriedly tap in another code, just to be met with the same locked screen.
+[[Back to room-&gt;Airlock]]
+[[Try again-&gt;Attempt2]]</tw-passagedata><tw-passagedata pid="33" name="Food" tags="2" position="1176,981" size="100,100">Searching the numerous trays, you find a little less than half of a brownie. Holding it in your hand and looking at it, you can&#39;t help but realize how long it&#39;s been since you had last eaten. Just as you bite into it, you are overcome with an immense feeling of nausea, and fall to your feet- landing on your back pops the brownie out of your mouth, as well as the wind out of you. Grabbing a nearby large green potted plant for support, you clamber to your feet as the overwhelming feeling suddenly fades. Backing away from the brownies and glancing at the plant you happened to grab, you notice it&#39;s wilted almost completely. You&#39;re not hungry anymore.
+[[Back to Cafeteria-&gt;Cafeteria]]</tw-passagedata><tw-passagedata pid="34" name="Kitchen" tags="1" position="1286,978" size="100,100">Walking into the kitchen, you see a generic large-scale kitchen for feeding the entire facility. Someone hasn&#39;t done the dishes in a long time.
+[[Search the kitchen-&gt;Search]]
+[[Back to main room-&gt;Cafeteria]]</tw-passagedata><tw-passagedata pid="35" name="Search" tags="2" position="1357.6666666666667,850.6666666666666" size="100,100">Looking through all of the cabinets in the kitchen, you find a decent amount of canned good as well as non-perishables, but nothing directly of use to you.
+[[Back to Cafeteria-&gt;Cafeteria]]</tw-passagedata><tw-passagedata pid="36" name="Exit" tags="" position="1563.6666666666667,845" size="100,100">As you approach the door with the big red blinking &quot;Exit&quot; sign, you can start to hear a slight beeping. Pushing the door open and exiting, you find yourself in a narrow tunnel- lined with remote explosives. Upon realizing the stakes, you run towards the end of the tunnel quickly until encountering a stairwell. Rushing up it as fast as you can, you arrive at another door. Opening it, you get the feeling that this is the first time you&#39;ve seen daylight in a long time. You take a moment to just breathe it in, and observe around you. You see some parked cars, and begin to think about if any of the keys could be back in the facility. Almost immediately after walking over to see if any of the cars were unlocked, you hear an earth-rending shudder which you can only assume to be the sealing of the underground facility. You start walking, towards the sun. You have no other choice.</tw-passagedata><tw-passagedata pid="37" name="Passatmpt" tags="1" position="2058.3333333333335,675.6666666666666" size="100,100">You are prompted by a very small monitor to enter a password for the tablet. You try:
+[[5213-&gt;Hint]]
+[[6612-&gt;Hint]]
+[[4998-&gt;Hint]]
+[[2345-&gt;Hint]]
+[[5003-&gt;Hint]]
+[[8235-&gt;Success]]
+[[8876-&gt;Hint]]
+[[4421-&gt;Hint]]
+[[6690-&gt;Hint]]
+[[1337-&gt;Hint]]
+[[7314-&gt;Hint]]
+[[8712-&gt;Hint]]
+[[6021-&gt;Hint]]
+[[Stop attempting to unlock the tablet-&gt;Administration]]</tw-passagedata><tw-passagedata pid="38" name="Hint" tags="1" position="1953.3333333333333,825.6666666666666" size="100,100">The number you typed in wipes from the input box, and a prompt appears.
+&quot;HINT: THE DAY WE SET OUT TO REINVENT HUMANITY&quot;
+[[6713-&gt;Hint]]
+[[8823-&gt;Hint]]
+[[9981-&gt;Hint]]
+[[2234-&gt;Hint]]
+[[7731-&gt;Hint]]
+[[5124-&gt;Hint]]
+[[5462-&gt;Hint]]
+[[8378-&gt;Hint]]
+[[4538-&gt;Hint]]
+[[5437-&gt;Hint]]
+[[8235-&gt;Success]]
+[[3758-&gt;Hint]]
+[[Stop attempting to unlock the tablet-&gt;Administration]]</tw-passagedata><tw-passagedata pid="39" name="Success" tags="8" position="2166.6666666666665,839" size="100,100">The screen goes blank as soon as you type in the 5 in 8235. An announcement from that same speaker behind your head bellows: &quot;Beginning data transfer for Homunculus project.&quot; This might take a while.</tw-passagedata><tw-passagedata pid="40" name="Administrationfake" tags="1" position="1601.6666666666667,514.6666666666666" size="100,100">You enter the administration office to a well-decorated room, far from the clean atmosphere of the Hallway or Airlock. Towards the back of the room, there is a large desk with a nameplate. It reads &quot;Michael Clark&quot;. All along the sides of the room are cabinets, which appear to be locked. In a burst of curiosity, you sit down at the chair to see if any of the desk cabinets are unlocked. Suddenly, a speaker near your head blares: &quot;COMMENCING DATA BACKUP. PLEASE SUBMIT DEVICE. The nameplate is kicked over and reveals a small docking port.</tw-passagedata></tw-storydata></div>
+        <script type='text/javascript'>document.getElementById('content').innerHTML = JSON.stringify(twineToJSON("twine"), null, 2);</script>
+	</body>
+</html>
+	

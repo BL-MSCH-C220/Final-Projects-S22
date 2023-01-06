@@ -1,0 +1,191 @@
+[gd_scene load_steps=15 format=2]
+
+[ext_resource path="res://UI/EndMenu.gd" type="Script" id=1]
+[ext_resource path="res://parallax-demon-woods-far-trees.png" type="Texture" id=2]
+[ext_resource path="res://parallax-demon-woods-bg.png" type="Texture" id=3]
+[ext_resource path="res://parallax-demon-woods-close-trees.png" type="Texture" id=4]
+[ext_resource path="res://parallax-demon-woods-mid-trees.png" type="Texture" id=5]
+[ext_resource path="res://UI/OrangeBackground.gd" type="Script" id=6]
+[ext_resource path="res://UI/MidTrees.gd" type="Script" id=7]
+[ext_resource path="res://UI/BackTrees.gd" type="Script" id=8]
+[ext_resource path="res://UI/FrontTrees.gd" type="Script" id=9]
+[ext_resource path="res://Assets/buttonStock1d (1).png" type="Texture" id=10]
+[ext_resource path="res://UI/Dosen Killer.otf" type="DynamicFontData" id=11]
+[ext_resource path="res://UI/Captain Blackjack.ttf" type="DynamicFontData" id=12]
+
+[sub_resource type="DynamicFont" id=2]
+size = 100
+outline_size = 8
+font_data = ExtResource( 12 )
+
+[sub_resource type="DynamicFont" id=1]
+size = 39
+outline_size = 3
+font_data = ExtResource( 11 )
+
+[node name="EndMenu" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource( 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="You Win!" type="Label" parent="."]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = -228.0
+margin_top = -239.0
+margin_right = 206.0
+margin_bottom = -139.0
+custom_colors/font_color = Color( 0.913725, 0.396078, 0.25098, 1 )
+custom_colors/font_outline_modulate = Color( 0, 0, 0, 1 )
+custom_fonts/font = SubResource( 2 )
+text = "You Win!"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="PlayAgain" type="Button" parent="."]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = -276.0
+margin_top = 1.0
+margin_right = 36.0
+margin_bottom = 207.0
+rect_scale = Vector2( 0.75, 0.75 )
+icon = ExtResource( 10 )
+flat = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="PlayAgain" type="Label" parent="PlayAgain"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = -85.0
+margin_top = -28.8333
+margin_right = 85.0
+margin_bottom = 18.1667
+custom_colors/font_color = Color( 1, 0.164706, 0, 1 )
+custom_colors/font_outline_modulate = Color( 0.305882, 0.0313726, 0.0313726, 1 )
+custom_fonts/font = SubResource( 1 )
+text = "Play Again?"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="MainMenu" type="Button" parent="."]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = -28.0
+margin_top = 1.0
+margin_right = 284.0
+margin_bottom = 207.0
+rect_scale = Vector2( 0.75, 0.75 )
+icon = ExtResource( 10 )
+flat = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Mainmenu" type="Label" parent="MainMenu"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = -74.3334
+margin_top = -26.1667
+margin_right = 95.6666
+margin_bottom = 20.8333
+custom_colors/font_color = Color( 1, 0.164706, 0, 1 )
+custom_colors/font_outline_modulate = Color( 0.305882, 0.0313726, 0.0313726, 1 )
+custom_fonts/font = SubResource( 1 )
+text = "Main Menu"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Quit" type="Button" parent="."]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = -156.0
+margin_top = 105.0
+margin_right = 156.0
+margin_bottom = 311.0
+rect_scale = Vector2( 0.75, 0.75 )
+icon = ExtResource( 10 )
+flat = true
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Quit" type="Label" parent="Quit"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = -85.0
+margin_top = -28.8333
+margin_right = 85.0
+margin_bottom = 21.1667
+custom_colors/font_color = Color( 1, 0.164706, 0, 1 )
+custom_colors/font_outline_modulate = Color( 0.305882, 0.0313726, 0.0313726, 1 )
+custom_fonts/font = SubResource( 1 )
+text = "Quit"
+align = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="ParallaxBackground" type="ParallaxBackground" parent="."]
+
+[node name="OrangeBackground" type="ParallaxLayer" parent="ParallaxBackground"]
+motion_mirroring = Vector2( 1024.1, 0 )
+script = ExtResource( 6 )
+
+[node name="Sprite" type="Sprite" parent="ParallaxBackground/OrangeBackground"]
+scale = Vector2( 2.13333, 2.20221 )
+texture = ExtResource( 3 )
+centered = false
+
+[node name="BackTrees" type="ParallaxLayer" parent="ParallaxBackground"]
+motion_mirroring = Vector2( 1024.1, 0 )
+script = ExtResource( 8 )
+
+[node name="Sprite" type="Sprite" parent="ParallaxBackground/BackTrees"]
+scale = Vector2( 1.73, 2.20221 )
+texture = ExtResource( 2 )
+centered = false
+
+[node name="MidTrees" type="ParallaxLayer" parent="ParallaxBackground"]
+motion_mirroring = Vector2( 1024.1, 0 )
+script = ExtResource( 7 )
+
+[node name="Sprite" type="Sprite" parent="ParallaxBackground/MidTrees"]
+scale = Vector2( 1.73, 2.202 )
+texture = ExtResource( 5 )
+centered = false
+
+[node name="FrontTrees" type="ParallaxLayer" parent="ParallaxBackground"]
+motion_mirroring = Vector2( 1024.1, 0 )
+script = ExtResource( 9 )
+
+[node name="Sprite" type="Sprite" parent="ParallaxBackground/FrontTrees"]
+scale = Vector2( 1.73, 2.202 )
+texture = ExtResource( 4 )
+centered = false
+
+[connection signal="pressed" from="PlayAgain" to="." method="_on_PlayAgain_pressed"]
+[connection signal="pressed" from="MainMenu" to="." method="_on_MainMenu_pressed"]
+[connection signal="pressed" from="Quit" to="." method="_on_Quit_pressed"]

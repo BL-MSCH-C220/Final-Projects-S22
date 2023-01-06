@@ -1,0 +1,60 @@
+[gd_scene load_steps=3 format=2]
+
+[ext_resource path="res://UI/Main_Menu.gd" type="Script" id=1]
+[ext_resource path="res://Assets/Map Tiles/cidade_demo2.png" type="Texture" id=2]
+
+[node name="Main_Menu" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = -1.0
+margin_top = 1.0
+margin_right = -1.0
+margin_bottom = 1.0
+script = ExtResource( 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Background" type="Node2D" parent="."]
+position = Vector2( 893, 297.75 )
+scale = Vector2( 9.29688, 9.33594 )
+
+[node name="BarrelRustTop" type="Sprite" parent="Background"]
+modulate = Color( 0.447059, 0.384314, 0.384314, 1 )
+position = Vector2( -40.8784, -8.64936 )
+scale = Vector2( 0.170419, 0.169706 )
+texture = ExtResource( 2 )
+
+[node name="Label" type="Label" parent="."]
+margin_left = 414.0
+margin_top = 267.0
+margin_right = 615.0
+margin_bottom = 281.0
+text = "Welcome to Tankie Terror!"
+align = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Play" type="Button" parent="."]
+margin_left = 462.0
+margin_top = 350.0
+margin_right = 562.0
+margin_bottom = 390.0
+text = "Play"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Quit" type="Button" parent="."]
+margin_left = 462.0
+margin_top = 400.0
+margin_right = 562.0
+margin_bottom = 440.0
+text = "Quit"
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[connection signal="pressed" from="Play" to="." method="_on_Play_pressed"]
+[connection signal="pressed" from="Quit" to="." method="_on_Quit_pressed"]

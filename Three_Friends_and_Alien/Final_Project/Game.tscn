@@ -1,0 +1,134 @@
+[gd_scene load_steps=15 format=2]
+
+[ext_resource path="res://Grid/grid.gd" type="Script" id=1]
+[ext_resource path="res://Pieces/Piece Background.tscn" type="PackedScene" id=2]
+[ext_resource path="res://UI/HUD.gd" type="Script" id=3]
+[ext_resource path="res://UI/Camera.gd" type="Script" id=4]
+[ext_resource path="res://UI/Instructions.gd" type="Script" id=5]
+[ext_resource path="res://alagard.ttf" type="DynamicFontData" id=6]
+[ext_resource path="res://Assets/Jaminus.ogg" type="AudioStream" id=7]
+[ext_resource path="res://Assets/JaminusFAST.ogg" type="AudioStream" id=8]
+[ext_resource path="res://Audio/Music_Controller.gd" type="Script" id=9]
+[ext_resource path="res://Assets/Fire sound.wav" type="AudioStream" id=10]
+[ext_resource path="res://background_game.png" type="Texture" id=11]
+
+[sub_resource type="DynamicFont" id=1]
+font_data = ExtResource( 6 )
+
+[sub_resource type="DynamicFont" id=2]
+font_data = ExtResource( 6 )
+
+[sub_resource type="DynamicFont" id=3]
+font_data = ExtResource( 6 )
+
+[node name="Game" type="Node2D"]
+
+[node name="BackgroundGame" type="Sprite" parent="."]
+position = Vector2( 302, 513 )
+texture = ExtResource( 11 )
+
+[node name="grid" type="Node2D" parent="."]
+script = ExtResource( 1 )
+width = 5
+height = 8
+xStart = 85
+yStart = 900
+offset = 100
+background = ExtResource( 2 )
+
+[node name="HUD" type="Control" parent="."]
+margin_right = 40.0
+margin_bottom = 40.0
+script = ExtResource( 3 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Score" type="Label" parent="HUD"]
+margin_left = 4.0
+margin_top = 1.0
+margin_right = 580.0
+margin_bottom = 21.0
+rect_scale = Vector2( 1.5, 1.5 )
+custom_colors/font_color = Color( 0, 0, 0, 1 )
+custom_fonts/font = SubResource( 1 )
+text = "Score: "
+
+[node name="Time" type="Label" parent="HUD"]
+margin_left = -292.0
+margin_top = 2.0
+margin_right = 273.0
+margin_bottom = 22.0
+rect_scale = Vector2( 1.5, 1.5 )
+custom_colors/font_color = Color( 0, 0, 0, 1 )
+custom_fonts/font = SubResource( 2 )
+text = "Time: "
+align = 2
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Timer" type="Timer" parent="HUD"]
+autostart = true
+
+[node name="Instructions" type="Control" parent="HUD"]
+pause_mode = 2
+visible = false
+margin_right = 40.0
+margin_bottom = 40.0
+script = ExtResource( 5 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="ColorRect" type="ColorRect" parent="HUD/Instructions"]
+margin_right = 576.0
+margin_bottom = 1024.0
+color = Color( 0, 0, 0, 0.752941 )
+
+[node name="Label" type="Label" parent="HUD/Instructions"]
+margin_right = 576.0
+margin_bottom = 952.0
+custom_fonts/font = SubResource( 3 )
+text = "TASK
+
+Don't let timer hit 0"
+align = 1
+valign = 1
+autowrap = true
+
+[node name="CD_Label" type="Label" parent="HUD/Instructions"]
+margin_right = 576.0
+margin_bottom = 1054.0
+custom_fonts/font = SubResource( 3 )
+text = "Starting in"
+align = 1
+valign = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Countdown" type="Timer" parent="HUD/Instructions"]
+autostart = true
+
+[node name="Effects" type="Node2D" parent="."]
+
+[node name="Camera" type="Camera2D" parent="."]
+anchor_mode = 0
+current = true
+script = ExtResource( 4 )
+
+[node name="Music_Normal" type="AudioStreamPlayer" parent="."]
+stream = ExtResource( 7 )
+
+[node name="Music_Fast" type="AudioStreamPlayer" parent="."]
+stream = ExtResource( 8 )
+
+[node name="Music_Controller" type="Node2D" parent="."]
+script = ExtResource( 9 )
+
+[node name="Fire_Sound" type="AudioStreamPlayer" parent="."]
+stream = ExtResource( 10 )
+
+[connection signal="timeout" from="HUD/Timer" to="HUD" method="_on_Timer_timeout"]
+[connection signal="timeout" from="HUD/Instructions/Countdown" to="HUD/Instructions" method="_on_Countdown_timeout"]
